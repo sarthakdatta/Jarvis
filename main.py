@@ -1,4 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_ollama.llms import OllamaLLM
 import ollama
 import pyttsx3
@@ -12,6 +13,8 @@ engine.setProperty('rate', 150)
 engine.setProperty('volume', 0.9)  
 
 OPEN_WEATHER_API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
+
+conversation_history = []
 
 def get_weather(city="Folsom"):
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPEN_WEATHER_API_KEY}&units=imperial"
@@ -46,6 +49,10 @@ def handle_command(text):
         return get_weather(city="Folsom")
     elif "stop" in text:
         return "Stopping the assistant."
+    elif "clear memory" in text or "forget our conversation" in text:
+        global conversation_history
+        conversation_history = []
+        return "Memory cleared. I've forgotten our previous conversation."
     
     return None
 
@@ -67,7 +74,6 @@ def listen_for_jarvis():
         engine.runAndWait()
         return ""
     
-
 text = ""
 while True:
     text = listen_for_jarvis()
@@ -82,7 +88,14 @@ while text != "stop":
     with sr.Microphone() as source:
         print("Listening for command...")
         audio = r.listen(source, timeout=5)
-        text = r.recognize_google(audio)
+        try:
+            text = r.recognize_google(audio)
+            print(f"User said: {text}")
+        except sr.UnknownValueError:
+            print("Could not understand the audio")
+            engine.say("Sorry, I did not understand that. Could you repeat?")
+            engine.runAndWait()
+            continue
 
     try:
         command_response = handle_command(text)
@@ -94,24 +107,43 @@ while text != "stop":
                 break 
             continue  
 
+        conversation_history.append(HumanMessage(content=text))
+
         template = """
-        You are a helpful assistant. You are an interactive chatbot that can answer questions and provide information. 
+        You are a helpful assistant named Jarvis. You are an interactive chatbot that can answer questions and provide information.
         Your job is to have a conversation with the human user and provide helpful and informative responses.
         Have a structured conversation, do not respond with long answers unless necessary.
+        
+        Conversation history:
+        {history}
+        
         The user asked: {question}
         """
 
-        prompt = ChatPromptTemplate.from_template(template)
+        history_text = ""
+        for msg in conversation_history:
+            if isinstance(msg, HumanMessage):
+                history_text += f"Human: {msg.content}\n"
+            else:
+                history_text += f"Jarvis: {msg.content}\n"
+        
+        prompt = template.format(history=history_text, question=text)
 
         response = ollama.chat(
             model="llama3.2",
             messages=[{
                 "role": "user",
-                "content": template.format(question=text)
+                "content": prompt
             }]
         )
 
         x = response["message"]["content"]
+        
+        conversation_history.append(AIMessage(content=x))
+        
+        if len(conversation_history) > 10:  
+            conversation_history = conversation_history[-10:]
+            
         engine.say(x)
         engine.runAndWait()
 
@@ -119,4 +151,7 @@ while text != "stop":
         print("Could not understand the audio")
         engine.say("Sorry, I did not understand that. Could you repeat?")
         engine.runAndWait()
-    
+    except Exception as e:
+        print(f"Error: {e}")
+        engine.say("I encountered an error. Please try again.")
+        engine.runAndWait()

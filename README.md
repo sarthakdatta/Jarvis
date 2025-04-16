@@ -11,11 +11,12 @@ Jarvis is a simple personal assistant built with Python, leveraging speech recog
 *   **Weather Information:** Retrieves and speaks the current weather information for a specified city (defaults to Folsom).
 *   **Conversational AI:**  Engages in conversations and answers questions using the `llama3.2` model through Ollama.
 *   **Text-to-Speech:** Uses `pyttsx3` to speak responses.
+*   **Multi-Turn Memory** Uses LangChain to store past conversations to make future responses more accurate
 
 ## Technology Stack
 
 *   **Python:** The core programming language.
-*   **Langchain:** For prompt engineering.
+*   **Langchain:** For prompt engineering and memory.
 *   **Ollama:** For running the `llama3.2` language model.
 *   **Pyttsx3:** For text-to-speech functionality.
 *   **SpeechRecognition:** For voice input.
